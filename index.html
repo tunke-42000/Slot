@@ -3,71 +3,64 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>PEKA Slot</title>
-  <link rel="stylesheet" href="style.css">
+  <title>JUGGLER Cabinet</title>
+  <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
-  <div id="game-container">
-    <div id="machine">
-      <!-- Lamp Area (Top) -->
-      <div id="lamp-section">
-        <div id="peka-lamp" class="lamp-off">
-          <div class="lamp-inner"></div>
-        </div>
+  <div id="cabinet">
+    <!-- 25% Top Decor -->
+    <div id="top-panel">
+      <div id="top-oval"></div>
+    </div>
+    
+    <!-- 40% Reel Area -->
+    <div id="mid-panel">
+    <!-- Central Reel Block -->
+    <div id="reel-block">
+      <!-- GOGO Lamp inside reel-block bottom-left -->
+      <div id="gogo-lamp" class="off">
+        <span class="chance-text">CHANCE</span>
+        <span class="gogo-text">GOGO!</span>
       </div>
-
-      <!-- Displays Area -->
-      <div id="display-section">
-        <div class="display-box">
-          <span class="label">CREDIT</span>
-          <span class="lcd-text" id="credit-display">50</span>
+        <div class="reel" id="strip-container-0">
+          <div class="strip" id="strip-0"></div>
         </div>
-        <div class="display-box">
-          <span class="label">PAYOUT</span>
-          <span class="lcd-text" id="payout-display">0</span>
+        <div class="reel" id="strip-container-1">
+          <div class="strip" id="strip-1"></div>
         </div>
+        <div class="reel" id="strip-container-2">
+          <div class="strip" id="strip-2"></div>
+        </div>
+        <!-- Center Line Glow -->
+        <div id="payline-center"></div>
+        <div id="reel-glare"></div>
       </div>
-
-      <!-- Reels Area -->
-      <div id="reels-section">
-        <!-- Payline Guides (faint overlaid lines) -->
-        <div class="payline-guide" id="line-1"></div>
-        <div class="payline-guide" id="line-2"></div>
-        <div class="payline-guide" id="line-3"></div>
-        <div class="payline-guide" id="line-4"></div>
-        <div class="payline-guide" id="line-5"></div>
-
-        <div class="reel-window" id="reel-0">
-          <div class="reel-strip" id="strip-0"></div>
-        </div>
-        <div class="reel-window" id="reel-1">
-          <div class="reel-strip" id="strip-1"></div>
-        </div>
-        <div class="reel-window" id="reel-2">
-          <div class="reel-strip" id="strip-2"></div>
-        </div>
-      </div>
-
-      <!-- Controls Area -->
-      <div id="controls-section">
-        <div id="lever-area">
-          <button id="spin-lever" class="metal-button">
-            <div class="lever-cap">SPIN</div>
-          </button>
-        </div>
-        
-        <div id="stops-area">
-          <!-- 1 = 1 line, 2 = 3 lines, 3 = 5 lines -->
-          <button class="bet-btn metal-button" id="btn-bet-1">1</button>
-          <button class="bet-btn metal-button" id="btn-bet-3">2</button>
-          <button class="bet-btn metal-button" id="btn-bet-5">3</button>
-        </div>
+    </div>
+    
+    <!-- 20% Operation Panel -->
+    <div id="bottom-panel">
+      <div id="digital-displays">
+        <div class="seg-display">CREDIT <span id="credit-display" class="led-text">100</span></div>
+        <div class="seg-display">PAYOUT <span id="payout-display" class="led-text">0</span></div>
       </div>
       
+      <div id="buttons-row">
+        <button class="stop-btn" id="btn-stop-1"><div class="btn-inner">1</div></button>
+        <button class="stop-btn" id="btn-stop-2"><div class="btn-inner">2</div></button>
+        <button class="stop-btn" id="btn-stop-3"><div class="btn-inner">3</div></button>
+      </div>
+      
+      <div id="spin-row">
+        <button id="spin-lever"><div class="spin-inner">SPIN</div></button>
+      </div>
     </div>
+    
+    <!-- 15% Illustration Panel -->
+    <div id="illustration-panel"></div>
   </div>
   
   <script src="audio.js"></script>
-  <script src="script.js"></script>
+  <script src="script.js?v=5"></script>
 </body>
 </html>

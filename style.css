@@ -1,0 +1,268 @@
+:root {
+  --bg-color: #2c251e; /* Dark wood/wall */
+  --machine-cream: #f4ecce; /* Main chassis - warm retro cream */
+  --machine-dark: #3b3228;
+  --accent-red: #8b1515; /* Deep red */
+  --accent-green: #1b4f31; /* Dark green */
+  --brass-gold: #c7a33a; /* Brass */
+  --brass-dark: #8c7123;
+  --lamp-off: #b52c2c;
+  --lamp-on: #fff0b3; /* The ultimate PEKA flash color */
+  
+  --lcd-bg: #111;
+  --lcd-text: #d46a6a;
+}
+
+* {
+  box-sizing: border-box;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-color);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  overflow: hidden;
+}
+
+#game-container {
+  width: 100%;
+  max-width: 480px;
+  height: 100%;
+  max-height: 850px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+#machine {
+  width: 95%;
+  height: 90%;
+  background-color: var(--machine-cream);
+  border-radius: 20px;
+  box-shadow: 
+    inset 0 0 20px rgba(0,0,0,0.1),
+    0 15px 35px rgba(0,0,0,0.5),
+    0 5px 10px rgba(0,0,0,0.3);
+  display: flex;
+  flex-direction: column;
+  padding: 20px 10px;
+  border: 4px solid var(--brass-gold);
+  position: relative;
+}
+
+/* ================== LAMP SECTION ================== */
+#lamp-section {
+  flex: 1.5;
+  background-color: var(--machine-dark);
+  border-radius: 12px;
+  margin-bottom: 15px;
+  border: 3px solid var(--accent-red);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-shadow: inset 0 5px 15px rgba(0,0,0,0.8);
+}
+
+#peka-lamp {
+  width: 120px;
+  height: 90px;
+  background-color: var(--lamp-off);
+  border-radius: 40px;
+  position: relative;
+  box-shadow: inset 0 3px 10px rgba(0,0,0,0.6), 0 2px 4px rgba(255,255,255,0.1);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  /* NO transition on background or box-shadow to ensure INSTANT POP */
+}
+
+.lamp-inner {
+  width: 90%;
+  height: 80%;
+  border-radius: 35px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(0,0,0,0.2) 100%);
+}
+
+#peka-lamp.peka-active {
+  background-color: var(--lamp-on);
+  box-shadow: 
+    0 0 40px 15px rgba(255, 240, 150, 0.9),
+    0 0 80px 30px rgba(255, 200, 50, 0.6),
+    inset 0 0 20px #fff;
+}
+#peka-lamp.peka-active .lamp-inner {
+  background: #fff;
+}
+
+/* ================== DISPLAY SECTION ================== */
+#display-section {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 15px;
+  padding: 0 10px;
+}
+
+.display-box {
+  background-color: var(--lcd-bg);
+  border: 3px solid var(--accent-green);
+  border-radius: 6px;
+  padding: 5px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 90px;
+  box-shadow: inset 0 2px 5px rgba(0,0,0,0.8);
+}
+
+.label {
+  color: var(--brass-gold);
+  font-size: 10px;
+  font-weight: bold;
+  margin-bottom: 2px;
+  letter-spacing: 1px;
+}
+
+.lcd-text {
+  color: var(--lcd-text);
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 24px;
+  font-weight: bold;
+  text-shadow: 0 0 5px rgba(212, 106, 106, 0.5);
+}
+
+/* ================== REELS SECTION ================== */
+#reels-section {
+  flex: 3;
+  background-color: #dfd7b8;
+  border-radius: 12px;
+  margin-bottom: 20px;
+  border: 4px solid var(--brass-dark);
+  box-shadow: inset 0 10px 20px rgba(0,0,0,0.3);
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  padding: 10px;
+}
+
+.reel-window {
+  width: 30%;
+  height: 90%;
+  background-color: #fff;
+  border-radius: 8px;
+  border: 2px solid #aaa;
+  box-shadow: inset 0 15px 15px -10px rgba(0,0,0,0.4), inset 0 -15px 15px -10px rgba(0,0,0,0.4);
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.reel-strip {
+  position: absolute;
+  top: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.symbol {
+  height: 100px; /* roughly the height of the window */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 60px;
+  font-weight: bold;
+  color: var(--accent-red);
+}
+
+.spin-anim {
+  /* Simple CSS animation for spinning visual effect, adjusted by JS */
+  animation: scrollReel 0.1s linear infinite;
+}
+
+@keyframes scrollReel {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-100px); }
+}
+
+/* ================== CONTROLS SECTION ================== */
+#controls-section {
+  flex: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.metal-button {
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  outline: none;
+  font-weight: bold;
+}
+
+.metal-button:active:not(:disabled) {
+  transform: translateY(4px);
+  box-shadow: none !important;
+}
+
+.metal-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+#lever-area {
+  display: flex;
+  justify-content: flex-start;
+  padding-left: 20px;
+  margin-bottom: 20px;
+}
+
+#spin-lever {
+  width: 70px;
+  height: 70px;
+  background: radial-gradient(circle at 30% 30%, #e6e6e6, #a1a1a1);
+  border: 2px solid #777;
+  box-shadow: 0 8px 0 #666, 0 15px 10px rgba(0,0,0,0.4);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0;
+}
+
+.lever-cap {
+  color: #333;
+  font-size: 14px;
+}
+
+#stops-area {
+  display: flex;
+  justify-content: space-around;
+  padding: 0 10px;
+}
+
+.stop-btn {
+  width: 80px;
+  height: 80px;
+  background: radial-gradient(circle at 30% 30%, var(--accent-red), #5a0d0d);
+  border: 3px solid #ff4d4d;
+  box-shadow: 0 8px 0 #4a0000, 0 12px 10px rgba(0,0,0,0.4);
+  color: white;
+  font-size: 30px;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+  transition: opacity 0.2s;
+}
+
+.stop-btn:active:not(:disabled) {
+  box-shadow: 0 2px 0 #4a0000, 0 4px 5px rgba(0,0,0,0.4) !important;
+  transform: translateY(6px);
+}

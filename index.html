@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>PEKA Slot</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="game-container">
+    <div id="machine">
+      <!-- Lamp Area (Top) -->
+      <div id="lamp-section">
+        <div id="peka-lamp" class="lamp-off">
+          <div class="lamp-inner"></div>
+        </div>
+      </div>
+
+      <!-- Displays Area -->
+      <div id="display-section">
+        <div class="display-box">
+          <span class="label">CREDIT</span>
+          <span class="lcd-text" id="credit-display">50</span>
+        </div>
+        <div class="display-box">
+          <span class="label">PAYOUT</span>
+          <span class="lcd-text" id="payout-display">0</span>
+        </div>
+      </div>
+
+      <!-- Reels Area -->
+      <div id="reels-section">
+        <div class="reel-window" id="reel-1">
+          <div class="reel-strip" id="strip-1">
+            <div class="symbol">7</div>
+          </div>
+        </div>
+        <div class="reel-window" id="reel-2">
+          <div class="reel-strip" id="strip-2">
+            <div class="symbol">7</div>
+          </div>
+        </div>
+        <div class="reel-window" id="reel-3">
+          <div class="reel-strip" id="strip-3">
+            <div class="symbol">7</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Controls Area -->
+      <div id="controls-section">
+        <div id="lever-area">
+          <button id="spin-lever" class="metal-button">
+            <div class="lever-cap">SPIN</div>
+          </button>
+        </div>
+        
+        <div id="stops-area">
+          <button class="stop-btn metal-button" id="btn-stop-1" disabled>1</button>
+          <button class="stop-btn metal-button" id="btn-stop-2" disabled>2</button>
+          <button class="stop-btn metal-button" id="btn-stop-3" disabled>3</button>
+        </div>
+      </div>
+      
+    </div>
+  </div>
+  
+  <script src="audio.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>

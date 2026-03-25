@@ -30,20 +30,21 @@
 
       <!-- Reels Area -->
       <div id="reels-section">
+        <!-- Payline Guides (faint overlaid lines) -->
+        <div class="payline-guide" id="line-1"></div>
+        <div class="payline-guide" id="line-2"></div>
+        <div class="payline-guide" id="line-3"></div>
+        <div class="payline-guide" id="line-4"></div>
+        <div class="payline-guide" id="line-5"></div>
+
+        <div class="reel-window" id="reel-0">
+          <div class="reel-strip" id="strip-0"></div>
+        </div>
         <div class="reel-window" id="reel-1">
-          <div class="reel-strip" id="strip-1">
-            <div class="symbol">7</div>
-          </div>
+          <div class="reel-strip" id="strip-1"></div>
         </div>
         <div class="reel-window" id="reel-2">
-          <div class="reel-strip" id="strip-2">
-            <div class="symbol">7</div>
-          </div>
-        </div>
-        <div class="reel-window" id="reel-3">
-          <div class="reel-strip" id="strip-3">
-            <div class="symbol">7</div>
-          </div>
+          <div class="reel-strip" id="strip-2"></div>
         </div>
       </div>
 
@@ -56,9 +57,10 @@
         </div>
         
         <div id="stops-area">
-          <button class="stop-btn metal-button" id="btn-stop-1" disabled>1</button>
-          <button class="stop-btn metal-button" id="btn-stop-2" disabled>2</button>
-          <button class="stop-btn metal-button" id="btn-stop-3" disabled>3</button>
+          <!-- 1 = 1 line, 2 = 3 lines, 3 = 5 lines -->
+          <button class="bet-btn metal-button" id="btn-bet-1">1</button>
+          <button class="bet-btn metal-button" id="btn-bet-3">2</button>
+          <button class="bet-btn metal-button" id="btn-bet-5">3</button>
         </div>
       </div>
       

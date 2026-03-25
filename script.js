@@ -125,10 +125,15 @@ function updateButtons() {
     betBtns[0].innerText = "1";
     betBtns[1].innerText = "2";
     betBtns[2].innerText = "3";
-    betBtns.forEach(b => {
+    betBtns.forEach((b, index) => {
       b.classList.remove('active');
-      b.style.opacity = '1';
-      b.disabled = false;
+      b.disabled = false; // Need to be focusable to receive clicks, block logic inside handleStop
+      // Only the currently expected button is bright
+      if (index === stopsPressed) {
+        b.style.opacity = '1';
+      } else {
+        b.style.opacity = '0.3';
+      }
     });
   }
 }
@@ -141,11 +146,12 @@ function updateBetUI() {
     if(activeLines === 5) betBtns[2].classList.add('active');
   }
   
-  paylineGuides.forEach((g, i) => {
-    g.classList.remove('win-glow');
-    if (i < activeLines && gameState === STATE_IDLE) g.classList.add('active');
-    else if (gameState !== STATE_IDLE) g.classList.remove('active');
-  });
+  // Payline guides are fully hidden unless winning, so no active class
+  if (gameState !== STATE_PAYOUT) {
+    paylineGuides.forEach(g => {
+      g.classList.remove('win-glow', 'active');
+    });
+  }
 }
 
 function updateDisplays() {
@@ -166,12 +172,15 @@ function handleSpin() {
   pekaLamp.classList.remove('peka-active');
   spinLever.disabled = true;
 
+  // Ensure previous win highlights are cleared safely
+  paylineGuides.forEach((g) => g.classList.remove('win-glow'));
+
+  stopsPressed = 0;
   updateButtons();
 
   audioEngine.playLever();
   audioEngine.startReelSpin();
 
-  stopsPressed = 0;
   for(let i=0; i<3; i++) {
     isSpinning[i] = true;
     isStopping[i] = false;
@@ -187,14 +196,14 @@ function handleSpin() {
 
 function handleStop(i) {
   if (!isSpinning[i] || isStopping[i]) return;
-  
-  betBtns[i].disabled = true;
-  betBtns[i].style.opacity = '0.5';
+  if (i !== stopsPressed) return; // Strict left -> mid -> right stopping out of order check
   
   isStopping[i] = true;
   stopsPressed++;
   
   audioEngine.playStop(stopsPressed);
+  
+  updateButtons(); // Dim the pressed one, brighten the next one
   
   // Meoshi mechanics - calculate nearest symbol to snap to
   let currentPos = reelPos[i];

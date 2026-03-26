@@ -3,6 +3,13 @@ const STATE_SPINNING = 1;
 const STATE_PAYOUT = 2;
 const STATE_BONUS = 3;
 
+const SCREEN_TITLE = 'title';
+const SCREEN_GAME = 'game';
+
+const SPIN_COST = 3;
+const BONUS_SPIN_COST = 1;
+
+let currentScreen = SCREEN_TITLE;
 let gameState = STATE_IDLE;
 let credits = 100;
 let bonusGamesRemaining = 0;
@@ -54,6 +61,11 @@ const REEL_SYMBOLS = 20;
 const SYMBOL_SIZE = 80;
 const CYCLE_HEIGHT = REEL_SYMBOLS * SYMBOL_SIZE;
 
+// --- Speed Configuration ---
+// SPIN_SPEED: Time per symbol (koma) in ms.
+// 80ms: Fast / 100ms: Standard / 120ms: Slow
+const SPIN_SPEED = 100; 
+
 // Reel State Object
 let reels = [
   { id: 0, pos: 5, targetPos: null, speed: 0, spinning: false, stopping: false, strip: STRIPS[0] },
@@ -86,6 +98,12 @@ const paylineCenter = document.getElementById('payline-center');
 const bonusCounterDiv = document.getElementById('bonus-counter-div');
 const bonusDisplay = document.getElementById('bonus-display');
 
+const titleScreen = document.getElementById('title-screen');
+const gameScreen = document.getElementById('game-screen');
+const creditOutOverlay = document.getElementById('credit-out-overlay');
+const btnStartGame = document.getElementById('btn-start-game');
+const btnReturnTitle = document.getElementById('btn-return-title');
+
 function initGame() {
   audioEngine = new RetroSlotAudio();
   
@@ -97,7 +115,66 @@ function initGame() {
     btn.addEventListener('pointerdown', () => handleStop(index));
   });
 
+  btnStartGame.addEventListener('click', () => {
+    audioEngine.playStart();
+    setTimeout(() => switchScreen(SCREEN_GAME), 600);
+  });
+  btnReturnTitle.addEventListener('click', () => {
+    resetGame();
+    switchScreen(SCREEN_TITLE);
+  });
+
   // Initial render
+  renderReels();
+  updateButtons();
+  updateDisplays();
+  switchScreen(SCREEN_TITLE);
+}
+
+function switchScreen(screen) {
+  currentScreen = screen;
+  if (screen === SCREEN_TITLE) {
+    titleScreen.classList.remove('hidden');
+    gameScreen.classList.add('hidden');
+    creditOutOverlay.classList.add('hidden');
+  } else {
+    titleScreen.classList.add('hidden');
+    gameScreen.classList.remove('hidden');
+  }
+}
+
+function resetGame() {
+  // Clear Intervals
+  if (payoutInterval) clearInterval(payoutInterval);
+  
+  // Reset Flags
+  gameState = STATE_IDLE;
+  credits = 100;
+  bonusGamesRemaining = 0;
+  isBonusMode = false;
+  stopsPressed = 0;
+  loopRunning = false;
+  winFlag = null;
+  plannedIndices = [0, 0, 0];
+
+  // Reset Reels
+  reels.forEach(r => {
+    r.pos = 5;
+    r.speed = 0;
+    r.spinning = false;
+    r.stopping = false;
+  });
+
+  // Reset UI
+  gogoLamp.classList.remove('gogo-active');
+  paylineCenter.classList.remove('win-glow');
+  payoutDisplay.innerText = '0';
+  creditOutOverlay.classList.add('hidden');
+  
+  // Audio Reset
+  audioEngine.stopReelSpin();
+  audioEngine.stopBonusBGM();
+
   renderReels();
   updateButtons();
   updateDisplays();
@@ -222,6 +299,14 @@ function updateDisplays() {
   } else {
     bonusCounterDiv.style.display = 'none';
   }
+
+  // Credit Out detection
+  const needed = isBonusMode ? BONUS_SPIN_COST : SPIN_COST;
+  if (credits < needed && gameState === STATE_IDLE) {
+    creditOutOverlay.classList.remove('hidden');
+  } else {
+    creditOutOverlay.classList.add('hidden');
+  }
 }
 
 function handleSpin() {
@@ -237,11 +322,18 @@ function handleSpin() {
     }
   }
 
-  const cost = isBonusMode ? 1 : 3;
+  const cost = isBonusMode ? BONUS_SPIN_COST : SPIN_COST;
   if (credits < cost) return;
+
+  // --- Lever Animation & Sound ---
+  spinLever.classList.add('is-pressed');
+  setTimeout(() => spinLever.classList.remove('is-pressed'), 120);
+  audioEngine.playReba();
+
   credits -= cost;
 
   payoutDisplay.innerText = '0';
+  audioEngine.gakoPlayed = false; // Reset flag
   updateDisplays();
   
   gameState = STATE_SPINNING;
@@ -269,6 +361,15 @@ function handleSpin() {
     r.speed = 0;
   });
 
+  // --- Gako Sound logic (Bonus Hit Notification) ---
+  const isBonusHit = (winFlag === WIN_TYPES.BIG || winFlag === WIN_TYPES.REG);
+  if (isBonusHit && !audioEngine.gakoPlayed) {
+    audioEngine.playGako();
+    audioEngine.gakoPlayed = true;
+    // Turn on lamp simultaneously with Gako sound
+    gogoLamp.classList.add('gogo-active');
+  }
+
   stopsPressed = 0;
   updateButtons();
 
@@ -290,6 +391,9 @@ function handleStop(i) {
   const r = reels[i];
   if (!r.spinning) return;
   
+  // --- Stop Button Sound (ziyagura-botan.mp3) ---
+  audioEngine.playBotan();
+
   // Instant Stop logic
   r.spinning = false;
   r.speed = 0;
@@ -299,12 +403,7 @@ function handleStop(i) {
   stopsPressed++; // used for sound variation mainly
   
   if (stopsPressed === 3) {
-    audioEngine.playTone('triangle', 300, 50, 0.2, 1.0);
-    audioEngine.playTone('square', 150, 30, 0.25, 0.7);
-    audioEngine.playTone('noise', 800, 100, 0.1, 0.4, true); 
     audioEngine.stopReelSpin();
-  } else {
-    audioEngine.playStop(stopsPressed);
   }
   
   updateButtons(); 
@@ -318,13 +417,17 @@ function gameLoop(time) {
   if (dt > 100) dt = 16; 
   
   let allStopped = true;
-  const MAX_SPEED = 0.5; // Symbols per frame (~30px / frame at 60fps)
+  
+  // Calculate Target Speed: symbols per frame (based on 60fps normalization)
+  // Target: 1 symbol per SPIN_SPEED (ms).
+  // At 60fps (16.66ms per frame), this is (16.66 / SPIN_SPEED) symbols per frame.
+  const TARGET_SPEED_60FPS = (16.666 / SPIN_SPEED); 
   
   reels.forEach(r => {
     if (r.spinning) {
       allStopped = false;
-      // Normal spinning
-      r.speed = Math.min(r.speed + 0.01 * (dt / 16), MAX_SPEED);
+      // Normal spinning with gradual acceleration
+      r.speed = Math.min(r.speed + 0.01 * (dt / 16), TARGET_SPEED_60FPS);
       r.pos += r.speed * (dt / 16);
       
       // Keep pos in reasonable bounds (e.g. [0, 20)) to avoid large float precision issues over long play

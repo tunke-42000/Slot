@@ -5,6 +5,12 @@ class RetroSlotAudio {
     this.spinInterval = null;
     this.isSpinning = false;
     this.bgmOscs = [];
+    this.gakoAudio = new Audio('./Sounds/ziyagura-gako.mp3');
+    this.gakoAudio.volume = 0.9;
+    this.rebaAudio = new Audio('./Sounds/ziyagura-reba.mp3');
+    this.rebaAudio.volume = 0.75;
+    this.botanAudio = new Audio('./Sounds/ziyagura-botan.mp3');
+    this.gakoPlayed = false;
   }
 
   init() {
@@ -250,4 +256,41 @@ class RetroSlotAudio {
     
     setTimeout(() => gain.disconnect(), 150);
   }
+
+  // 8. Title Start Sound
+  playStart() {
+    this.init();
+    const t = this.ctx.currentTime;
+    // Arpeggio: C5 -> E5 -> G5 -> C6
+    const notes = [523.25, 659.25, 783.99, 1046.50];
+    notes.forEach((freq, i) => {
+      setTimeout(() => {
+        this.playTone('sine', freq, freq * 1.05, 0.3, 0.3);
+      }, i * 100);
+    });
+  }
+
+  playGako() {
+    if (this.gakoAudio) {
+      this.gakoAudio.currentTime = 0;
+      this.gakoAudio.play().catch(() => {});
+    }
+  }
+
+  // Stop Button Sound (Every reel stop)
+  playBotan() {
+    if (this.botanAudio) {
+      this.botanAudio.currentTime = 0;
+      this.botanAudio.play().catch(() => {});
+    }
+  }
+
+  // Lever ON Sound (Every spin start)
+  playReba() {
+    if (this.rebaAudio) {
+      this.rebaAudio.currentTime = 0;
+      this.rebaAudio.play().catch(() => {});
+    }
+  }
 }
+

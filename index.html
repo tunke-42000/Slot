@@ -9,59 +9,90 @@
 </head>
 <body>
   <div id="cabinet">
-    <!-- 25% Top Decor -->
-    <div id="top-panel">
-      <div id="top-oval"></div>
-    </div>
-    
-    <!-- 40% Reel Area -->
-    <div id="mid-panel">
-    <!-- Central Reel Block -->
-    <div id="reel-block">
-      <!-- GOGO Lamp inside reel-block bottom-left -->
-      <div id="gogo-lamp" class="off">
-        <span class="chance-text">CHANCE</span>
-        <span class="gogo-text">GOGO!</span>
+    <!-- Title Screen Layer -->
+    <div id="title-screen">
+      <div class="title-logo">
+        <span class="j">J</span>UGGLER
       </div>
-        <div class="reel" id="strip-container-0">
-          <div class="strip" id="strip-0"></div>
-        </div>
-        <div class="reel" id="strip-container-1">
-          <div class="strip" id="strip-1"></div>
-        </div>
-        <div class="reel" id="strip-container-2">
-          <div class="strip" id="strip-2"></div>
-        </div>
-        <!-- Center Line Glow -->
-        <div id="payline-center"></div>
-        <div id="reel-glare"></div>
-      </div>
+      <button id="btn-start-game" class="premium-btn">
+        <div class="btn-inner">遊戯を開始する</div>
+      </button>
     </div>
-    
-    <!-- 20% Operation Panel -->
-    <div id="bottom-panel">
-      <div id="digital-displays">
-        <div class="seg-display">CREDIT <span id="credit-display" class="led-text">100</span></div>
-        <div class="seg-display">PAYOUT <span id="payout-display" class="led-text">0</span></div>
-        <div class="seg-display" id="bonus-counter-div" style="display:none;">BONUS <span id="bonus-display" class="led-text">0</span></div>
+
+    <!-- Game Screen Layer -->
+    <div id="game-screen" class="hidden">
+      <!-- 25% Top Decor -->
+      <div id="top-panel">
+        <div id="top-oval"></div>
       </div>
       
-      <div id="buttons-row">
-        <button class="stop-btn" id="btn-stop-1"><div class="btn-inner">1</div></button>
-        <button class="stop-btn" id="btn-stop-2"><div class="btn-inner">2</div></button>
-        <button class="stop-btn" id="btn-stop-3"><div class="btn-inner">3</div></button>
+      <!-- 40% Reel Area -->
+      <div id="mid-panel">
+        <!-- Central Reel Block -->
+        <div id="reel-block">
+          <!-- GOGO Lamp inside reel-block bottom-left -->
+          <div id="gogo-lamp" class="off">
+            <span class="chance-text">CHANCE</span>
+            <span class="gogo-text">GOGO!</span>
+          </div>
+          <div class="reel" id="strip-container-0">
+            <div class="strip" id="strip-0"></div>
+          </div>
+          <div class="reel" id="strip-container-1">
+            <div class="strip" id="strip-1"></div>
+          </div>
+          <div class="reel" id="strip-container-2">
+            <div class="strip" id="strip-2"></div>
+          </div>
+          <!-- Center Line Glow -->
+          <div id="payline-center"></div>
+          <div id="reel-glare"></div>
+        </div>
+
+        <!-- Credit Out Overlay (Inside mid-panel for visibility) -->
+        <div id="credit-out-overlay" class="hidden">
+          <div class="msg-box">
+            <p>クレジット不足です<br><small>（3枚必要です）</small></p>
+            <button id="btn-return-title" class="premium-btn">
+              <div class="btn-inner">タイトルに戻る</div>
+            </button>
+          </div>
+        </div>
       </div>
       
-      <div id="spin-row">
-        <button id="spin-lever"><div class="spin-inner">SPIN</div></button>
+      <!-- 20% Operation Panel -->
+      <div id="bottom-panel">
+        <div id="digital-displays">
+          <div class="seg-display">CREDIT <span id="credit-display" class="led-text">100</span></div>
+          <div class="seg-display">PAYOUT <span id="payout-display" class="led-text">0</span></div>
+          <div class="seg-display" id="bonus-counter-div" style="display:none;">BONUS <span id="bonus-display" class="led-text">0</span></div>
+        </div>
+        
+        <div id="operational-row">
+          <div id="lever-area">
+            <div id="lever-base">
+              <div id="spin-lever">
+                <div class="lever-shaft"></div>
+                <div class="lever-knob"></div>
+              </div>
+            </div>
+            <div class="lever-label">START</div>
+          </div>
+
+          <div id="buttons-row">
+            <button class="stop-btn" id="btn-stop-1"><div class="btn-inner">1</div></button>
+            <button class="stop-btn" id="btn-stop-2"><div class="btn-inner">2</div></button>
+            <button class="stop-btn" id="btn-stop-3"><div class="btn-inner">3</div></button>
+          </div>
+        </div>
       </div>
+      
+      <!-- 15% Illustration Panel -->
+      <div id="illustration-panel"></div>
     </div>
-    
-    <!-- 15% Illustration Panel -->
-    <div id="illustration-panel"></div>
   </div>
   
-  <script src="audio.js"></script>
+  <script src="./Sounds/audio.js"></script>
   <script src="script.js?v=5"></script>
 </body>
 </html>

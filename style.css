@@ -72,13 +72,13 @@ body {
 
 #gogo-lamp {
   position: absolute;
-  bottom: -70px;
-  left: -7px; /* Align with reel-block border */
-  width: 95px;
-  height: 60px;
+  top: 175px; /* Position inside reel-block instead of hanging below */
+  left: 0;
+  width: 90px;
+  height: 55px;
   background: #030303;
   border-radius: 0 0 0 6px;
-  border: 3px solid #222;
+  border: 2px solid #222;
   box-shadow: inset 0 2px 10px #000;
   display: flex;
   flex-direction: column;
@@ -86,7 +86,7 @@ body {
   align-items: center;
   opacity: 0.18;
   transition: opacity 0.1s, box-shadow 0.1s, background 0.1s;
-  z-index: 5;
+  z-index: 50; /* Above reels */
 }
 
 #gogo-lamp.gogo-active {
@@ -114,6 +114,13 @@ body {
   text-shadow: 0 0 10px #ff007f, 0 0 2px #fff;
   font-style: italic;
   margin-top: -3px;
+  animation: jitter 0.05s infinite;
+}
+
+@keyframes jitter {
+  0% { transform: translate(0,0); }
+  50% { transform: translate(1px, -1px); }
+  100% { transform: translate(-1px, 1px); }
 }
 
 #reel-block {
@@ -125,7 +132,7 @@ body {
   box-shadow: 0 5px 15px rgba(0,0,0,0.8), inset 0 10px 20px rgba(0,0,0,0.6);
   display: flex;
   position: relative;
-  overflow: visible; /* Allow GOGO lamp to hang below */
+  overflow: hidden; /* Strict clipping for reels */
 }
 
 #reel-glare {
@@ -165,6 +172,7 @@ body {
   flex: 1;
   position: relative;
   border-right: 2px solid #999;
+  overflow: hidden; /* Prevent symbols from leaking out */
 }
 .reel:last-child { border-right: none; }
 
@@ -173,8 +181,6 @@ body {
   width: 100%;
   top: 0; left: 0;
 }
-
-.strip.blur { filter: blur(3px); }
 
 /* SYMBOL GRAPHICS */
 .symbol {
@@ -185,6 +191,7 @@ body {
   align-items: center;
   font-size: 45px;
   text-shadow: 2px 2px 4px rgba(0,0,0,0.4);
+  pointer-events: none; /* Never block clicks */
 }
 .sym-7 {
   color: #ff1111;
@@ -208,9 +215,78 @@ body {
   font-family: Impact, sans-serif;
   font-size: 26px;
   letter-spacing: 2px;
-  padding: 5px 6px;
+  padding: 5px 12px;
   box-shadow: inset 0 0 5px rgba(255,255,255,0.4), 2px 2px 4px rgba(0,0,0,0.6);
   border-radius: 3px;
+  border: 1px solid #444;
+}
+
+/* CSS HIGH-FIDELITY SYMBOLS */
+.sym-bell {
+  width: 50px;
+  height: 50px;
+  background: radial-gradient(circle at 30% 30%, #ffd700, #b8860b);
+  clip-path: polygon(20% 100%, 80% 100%, 100% 80%, 90% 20%, 50% 0%, 10% 20%, 0% 80%);
+  position: relative;
+  box-shadow: inset -2px -2px 5px rgba(0,0,0,0.5), 2px 4px 6px rgba(0,0,0,0.3);
+}
+.sym-bell::after {
+  content: '';
+  position: absolute;
+  bottom: -5px; left: 50%; transform: translateX(-50%);
+  width: 15px; height: 10px; background: #8B4513; border-radius: 50%;
+}
+
+.sym-cherry {
+  display: flex; gap: 4px; position: relative;
+}
+.cherry-dot {
+  width: 24px; height: 24px;
+  background: radial-gradient(circle at 35% 35%, #ff4d4d, #b30000);
+  border-radius: 50%;
+  box-shadow: 1px 2px 4px rgba(0,0,0,0.4);
+}
+.cherry-stem {
+  position: absolute; top: -15px; left: 50%; transform: translateX(-50%);
+  width: 30px; height: 20px; border-top: 3px solid #64a338; border-radius: 50%;
+}
+
+.sym-grape {
+  display: grid; grid-template-columns: repeat(3, 12px); gap: 2px;
+  transform: rotate(-5deg);
+}
+.grape-dot {
+  width: 15px; height: 15px;
+  background: radial-gradient(circle at 35% 35%, #9b30ff 0%, #4b0082 100%);
+  border-radius: 50%;
+  box-shadow: 1px 1px 3px rgba(0,0,0,0.5), inset -1px -1px 2px rgba(0,0,0,0.3);
+}
+
+.sym-clown {
+  width: 55px; height: 55px; background: #fff; border-radius: 50%;
+  border: 3px solid #333; position: relative; overflow: hidden;
+  box-shadow: inset 0 0 10px rgba(0,0,0,0.2), 2px 2px 5px rgba(0,0,0,0.3);
+}
+.clown-nose {
+  position: absolute; top: 55%; left: 50%; transform: translate(-50%, -50%);
+  width: 14px; height: 14px; background: #ff0000; border-radius: 50%;
+}
+.clown-eye {
+  position: absolute; top: 35%; width: 8px; height: 8px; background: #000; border-radius: 50%;
+}
+.clown-eye.left { left: 25%; }
+.clown-eye.right { right: 25%; }
+.clown-mouth {
+  position: absolute; bottom: 10%; left: 50%; transform: translateX(-50%);
+  width: 25px; height: 10px; border-bottom: 3px solid #ff0000; border-radius: 50%;
+}
+
+.symbol-blank {
+  width: 100%; height: 80px;
+}
+
+.symbol-blank {
+  width: 100%; height: 80px;
 }
 
 /* 3. CONTROL PANEL (20%) */
@@ -275,6 +351,7 @@ body {
   outline: none;
   cursor: pointer;
   transition: opacity 0.2s;
+  z-index: 100; /* Ensure on top */
 }
 
 .stop-btn .btn-inner {
@@ -324,6 +401,7 @@ body {
   box-shadow: 0 5px 8px rgba(0,0,0,0.8), inset 0 2px 4px rgba(255,255,255,0.4);
   outline: none;
   cursor: pointer;
+  z-index: 100; /* Ensure on top */
 }
 
 #spin-lever .spin-inner {

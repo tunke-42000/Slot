@@ -1,20 +1,23 @@
 const STATE_IDLE = 0;
 const STATE_SPINNING = 1;
 const STATE_PAYOUT = 2;
+const STATE_BONUS = 3;
 
 let gameState = STATE_IDLE;
 let credits = 100;
+let bonusGamesRemaining = 0;
+let isBonusMode = false;
 let audioEngine;
 let payoutInterval = null;
 
 const SYMBOLS = {
   S7: "<div class='sym-7'>7<span class='star'>★</span></div>",
   BAR: "<div class='sym-bar'>BAR</div>",
-  BELL: "🔔",
-  PIERROT: "🤡",
-  GRAPE: "🍇",
-  CHERRY: "🍒",
-  BLANK: "" // Empty slot
+  BELL: "<div class='sym-bell'></div>",
+  PIERROT: "<div class='sym-clown'><div class='clown-eye left'></div><div class='clown-eye right'></div><div class='clown-nose'></div><div class='clown-mouth'></div></div>",
+  GRAPE: "<div class='sym-grape'><div class='grape-dot'></div><div class='grape-dot'></div><div class='grape-dot'></div><div class='grape-dot'></div><div class='grape-dot'></div><div class='grape-dot'></div></div>",
+  CHERRY: "<div class='sym-cherry'><div class='cherry-dot'></div><div class='cherry-dot'></div><div class='cherry-stem'></div></div>",
+  BLANK: "<div class='symbol-blank'></div>" 
 };
 
 const WIN_TYPES = {
@@ -37,35 +40,32 @@ const PAYOUTS = {
   LOSE: 0
 };
 
+const STRIPS = [
+  [SYMBOLS.S7, SYMBOLS.GRAPE, SYMBOLS.BELL, SYMBOLS.CHERRY, SYMBOLS.GRAPE, SYMBOLS.S7, SYMBOLS.BELL, SYMBOLS.GRAPE, SYMBOLS.CHERRY, SYMBOLS.BAR, SYMBOLS.GRAPE, SYMBOLS.BELL, SYMBOLS.S7, SYMBOLS.GRAPE, SYMBOLS.CHERRY, SYMBOLS.BELL, SYMBOLS.GRAPE, SYMBOLS.BAR, SYMBOLS.BELL, SYMBOLS.GRAPE],
+  [SYMBOLS.S7, SYMBOLS.BELL, SYMBOLS.GRAPE, SYMBOLS.PIERROT, SYMBOLS.GRAPE, SYMBOLS.S7, SYMBOLS.BELL, SYMBOLS.GRAPE, SYMBOLS.PIERROT, SYMBOLS.BAR, SYMBOLS.GRAPE, SYMBOLS.BELL, SYMBOLS.S7, SYMBOLS.GRAPE, SYMBOLS.PIERROT, SYMBOLS.BELL, SYMBOLS.GRAPE, SYMBOLS.BAR, SYMBOLS.BELL, SYMBOLS.GRAPE],
+  [SYMBOLS.S7, SYMBOLS.PIERROT, SYMBOLS.BELL, SYMBOLS.GRAPE, SYMBOLS.PIERROT, SYMBOLS.S7, SYMBOLS.BELL, SYMBOLS.GRAPE, SYMBOLS.PIERROT, SYMBOLS.BAR, SYMBOLS.GRAPE, SYMBOLS.BELL, SYMBOLS.S7, SYMBOLS.GRAPE, SYMBOLS.PIERROT, SYMBOLS.BELL, SYMBOLS.GRAPE, SYMBOLS.BAR, SYMBOLS.BELL, SYMBOLS.GRAPE]
+];
+
 const FILLER_SYMBOLS = [
-  SYMBOLS.BLANK, SYMBOLS.BLANK, SYMBOLS.BLANK, SYMBOLS.BLANK, SYMBOLS.BLANK, SYMBOLS.BLANK, SYMBOLS.BLANK, SYMBOLS.BLANK,
-  SYMBOLS.BLANK, SYMBOLS.BLANK, // Extra blanks
-  SYMBOLS.S7, SYMBOLS.BAR, SYMBOLS.BELL, SYMBOLS.PIERROT, SYMBOLS.GRAPE
+  SYMBOLS.BELL, SYMBOLS.GRAPE, SYMBOLS.PIERROT, SYMBOLS.CHERRY, SYMBOLS.S7, SYMBOLS.BAR
 ];
 
 const REEL_SYMBOLS = 20;
 const SYMBOL_SIZE = 80;
 const CYCLE_HEIGHT = REEL_SYMBOLS * SYMBOL_SIZE;
 
-let targetGrid = [];
-let reelsData = [[], [], []];
-let expandedReels = [[], [], []];
-let grid = [
-  [null, null, null],
-  [null, null, null],
-  [null, null, null]
+// Reel State Object
+let reels = [
+  { id: 0, pos: 5, targetPos: null, speed: 0, spinning: false, stopping: false, strip: STRIPS[0] },
+  { id: 1, pos: 5, targetPos: null, speed: 0, spinning: false, stopping: false, strip: STRIPS[1] },
+  { id: 2, pos: 5, targetPos: null, speed: 0, spinning: false, stopping: false, strip: STRIPS[2] }
 ];
 
-// Spin physics
-let reelPos = [0, 0, 0];
-let reelSpeed = [0, 0, 0];
-const MAX_SPEED = 30; 
-let isSpinning = [false, false, false];
-let isStopping = [false, false, false];
-let stopTargets = [0, 0, 0];
 let stopsPressed = 0;
 let loopRunning = false;
 let lastTime = 0;
+let winFlag = null;
+let plannedIndices = [0, 0, 0];
 
 // DOM Elements
 const spinLever = document.getElementById('spin-lever');
@@ -83,30 +83,63 @@ const reelStrips = [
   document.getElementById('strip-2')
 ];
 const paylineCenter = document.getElementById('payline-center');
+const bonusCounterDiv = document.getElementById('bonus-counter-div');
+const bonusDisplay = document.getElementById('bonus-display');
 
 function initGame() {
   audioEngine = new RetroSlotAudio();
   
-  spinLever.addEventListener('mousedown', handleSpin);
+  spinLever.disabled = false;
+  spinLever.addEventListener('click', handleSpin);
   spinLever.addEventListener('touchstart', (e) => { e.preventDefault(); handleSpin(); });
 
   betBtns.forEach((btn, index) => {
-    btn.addEventListener('mousedown', () => handleStop(index));
-    btn.addEventListener('touchstart', (e) => { e.preventDefault(); handleStop(index); });
+    btn.addEventListener('pointerdown', () => handleStop(index));
   });
 
-  // Random visual reels for initial idle state
-  for (let i = 0; i < 3; i++) {
-    expandedReels[i] = [];
-    for(let k=0; k<60; k++) expandedReels[i].push(FILLER_SYMBOLS[Math.floor(Math.random() * FILLER_SYMBOLS.length)]);
-    reelStrips[i].innerHTML = expandedReels[i].map(s => `<div class="symbol">${s}</div>`).join('');
-    reelPos[i] = SYMBOL_SIZE * 5; // Show filled row from the start
-    reelStrips[i].style.transition = 'none';
-    reelStrips[i].style.transform = `translateY(-${reelPos[i]}px)`;
-  }
-  
+  // Initial render
+  renderReels();
   updateButtons();
   updateDisplays();
+}
+
+function getSymbol(strip, index) {
+  const len = strip.length;
+  // Use modulo for wrap-around (handle negative indices too)
+  return strip[((index % len) + len) % len];
+}
+
+function renderReels() {
+  reels.forEach((r, i) => {
+    const stripEl = reelStrips[i];
+    const intPos = Math.floor(r.pos);
+    const frac = r.pos - intPos;
+    
+    // User definition: Middle = position
+    // So we render symbols at: [pos-2, pos-1, pos, pos+1, pos+2]
+    // index 2 (pos) will be the center.
+    const symbols = [
+      getSymbol(r.strip, intPos - 2), // Peeking top
+      getSymbol(r.strip, intPos - 1), // Top Row
+      getSymbol(r.strip, intPos),     // Middle Row (Center Line)
+      getSymbol(r.strip, intPos + 1), // Bottom Row
+      getSymbol(r.strip, intPos + 2)  // Peeking bottom
+    ];
+    
+    stripEl.innerHTML = symbols.map(s => `<div class="symbol">${s}</div>`).join('');
+    
+    // Offset calculation:
+    // With 5 symbols, the center of the 3rd symbol is at y = 2.5 * 80? No.
+    // Each .symbol is 80px.
+    // 5 symbols = 400px high.
+    // Reel window is 240px high (3 symbols).
+    // To center the 3 visible symbols (pos-1, pos, pos+1), 
+    // we need to hide the top peeking symbol (pos-2).
+    // So translateY starts at -80px.
+    // Plus the fractional part: -(frac * 80).
+    const offsetY = -80 - (frac * SYMBOL_SIZE);
+    stripEl.style.transform = `translateY(${offsetY}px)`;
+  });
 }
 
 function getSpinOutcome() {
@@ -120,101 +153,41 @@ function getSpinOutcome() {
   return WIN_TYPES.LOSE;
 }
 
-function hasAccidentalWin(gridCopy, intent) {
-  const lc = [
-    [[1,0], [1,1], [1,2]], 
-    [[0,0], [0,1], [0,2]], 
-    [[2,0], [2,1], [2,2]], 
-    [[0,0], [1,1], [2,2]], 
-    [[2,0], [1,1], [0,2]]
-  ];
-  let validWinsFound = 0;
-  for(let i=0; i<5; i++) {
-    let s0 = gridCopy[lc[i][0][0]][lc[i][0][1]];
-    let s1 = gridCopy[lc[i][1][0]][lc[i][1][1]];
-    let s2 = gridCopy[lc[i][2][0]][lc[i][2][1]];
-    if (s0 && s1 && s2 && s0 !== SYMBOLS.BLANK && s0 !== SYMBOLS.CHERRY) { // Cherry has no 3-match payout rule line directly, but let's avoid it too
-      if (s0 === s1 && s1 === s2) validWinsFound++;
-      else if (s0 === SYMBOLS.S7 && s1 === SYMBOLS.S7 && s2 === SYMBOLS.BAR) validWinsFound++;
-    }
-  }
+function computePlannedIndices(outcome) {
+  const indices = [0,0,0];
+  const maxAttempts = 1000;
   
-  if (intent === WIN_TYPES.LOSE || intent === WIN_TYPES.CHERRY) return validWinsFound > 0;
-  return validWinsFound > 1; 
-}
-
-function getSafeSymbol(gridCopy, row, col, outcome) {
-  let attempts = 0;
-  while(attempts < 10) {
-    let candidate = FILLER_SYMBOLS[Math.floor(Math.random() * FILLER_SYMBOLS.length)];
-    if (col === 0 && candidate === SYMBOLS.CHERRY && outcome !== WIN_TYPES.CHERRY) continue;
+  for(let i=0; i<maxAttempts; i++) {
+    indices[0] = Math.floor(Math.random() * 20);
+    indices[1] = Math.floor(Math.random() * 20);
+    indices[2] = Math.floor(Math.random() * 20);
     
-    gridCopy[row][col] = candidate;
-    if (!hasAccidentalWin(gridCopy, outcome)) {
-      return candidate;
+    // Check outcome
+    const grid = [
+      [getSymbol(STRIPS[0], indices[0]-1), getSymbol(STRIPS[1], indices[1]-1), getSymbol(STRIPS[2], indices[2]-1)],
+      [getSymbol(STRIPS[0], indices[0]),   getSymbol(STRIPS[1], indices[1]),   getSymbol(STRIPS[2], indices[2])],
+      [getSymbol(STRIPS[0], indices[0]+1), getSymbol(STRIPS[1], indices[1]+1), getSymbol(STRIPS[2], indices[2]+1)]
+    ];
+    
+    // Simplified payout check for finding indices
+    let currentOutcome = WIN_TYPES.LOSE;
+    const lc = [[[1,0],[1,1],[1,2]],[[0,0],[0,1],[0,2]],[[2,0],[2,1],[2,2]],[[0,0],[1,1],[2,2]],[[2,0],[1,1],[0,2]]];
+    
+    for(let line of lc) {
+      let s0 = grid[line[0][0]][line[0][1]], s1 = grid[line[1][0]][line[1][1]], s2 = grid[line[2][0]][line[2][1]];
+      if (s0 === SYMBOLS.S7 && s1 === SYMBOLS.S7 && s2 === SYMBOLS.S7) currentOutcome = WIN_TYPES.BIG;
+      else if (s0 === SYMBOLS.S7 && s1 === SYMBOLS.S7 && s2 === SYMBOLS.BAR) currentOutcome = WIN_TYPES.REG;
+      else if (s0 === SYMBOLS.BELL && s1 === SYMBOLS.BELL && s2 === SYMBOLS.BELL) if(currentOutcome === WIN_TYPES.LOSE) currentOutcome = WIN_TYPES.BELL;
+      // ... more checks if needed, but BIG/REG/LOSE are most critical for stopping
     }
-    gridCopy[row][col] = null;
-    attempts++;
-  }
-  return SYMBOLS.BLANK;
-}
-
-function generateTargetGrid(outcome) {
-  let finalGrid = [
-    [null, null, null],
-    [null, null, null],
-    [null, null, null]
-  ];
-  const lc = [
-    [[1,0], [1,1], [1,2]], 
-    [[0,0], [0,1], [0,2]], 
-    [[2,0], [2,1], [2,2]], 
-    [[0,0], [1,1], [2,2]], 
-    [[2,0], [1,1], [0,2]]  
-  ];
-
-  let winningLineIndex = Math.floor(Math.random() * 5);
-  let coords = lc[winningLineIndex];
-
-  if (outcome === WIN_TYPES.BIG) {
-    finalGrid[coords[0][0]][coords[0][1]] = SYMBOLS.S7;
-    finalGrid[coords[1][0]][coords[1][1]] = SYMBOLS.S7;
-    finalGrid[coords[2][0]][coords[2][1]] = SYMBOLS.S7;
-  } else if (outcome === WIN_TYPES.REG) {
-    finalGrid[coords[0][0]][coords[0][1]] = SYMBOLS.S7;
-    finalGrid[coords[1][0]][coords[1][1]] = SYMBOLS.S7;
-    finalGrid[coords[2][0]][coords[2][1]] = SYMBOLS.BAR;
-  } else if (outcome === WIN_TYPES.BELL) {
-    finalGrid[coords[0][0]][coords[0][1]] = SYMBOLS.BELL;
-    finalGrid[coords[1][0]][coords[1][1]] = SYMBOLS.BELL;
-    finalGrid[coords[2][0]][coords[2][1]] = SYMBOLS.BELL;
-  } else if (outcome === WIN_TYPES.PIERROT) {
-    finalGrid[coords[0][0]][coords[0][1]] = SYMBOLS.PIERROT;
-    finalGrid[coords[1][0]][coords[1][1]] = SYMBOLS.PIERROT;
-    finalGrid[coords[2][0]][coords[2][1]] = SYMBOLS.PIERROT;
-  } else if (outcome === WIN_TYPES.GRAPE) {
-    finalGrid[coords[0][0]][coords[0][1]] = SYMBOLS.GRAPE;
-    finalGrid[coords[1][0]][coords[1][1]] = SYMBOLS.GRAPE;
-    finalGrid[coords[2][0]][coords[2][1]] = SYMBOLS.GRAPE;
-  } else if (outcome === WIN_TYPES.CHERRY) {
-    let cherryRow = Math.floor(Math.random() * 3);
-    finalGrid[cherryRow][0] = SYMBOLS.CHERRY;
-  }
-
-  // Fill remainder to avoid accidental lines
-  for(let row=0; row<3; row++) {
-    for(let col=0; col<3; col++) {
-      if (finalGrid[row][col] === null) {
-        if (col === 0 && outcome !== WIN_TYPES.CHERRY) {
-          finalGrid[row][col] = Math.random() < 0.8 ? SYMBOLS.BLANK : (Math.random() < 0.5 ? SYMBOLS.GRAPE : SYMBOLS.BELL);
-        } else {
-          finalGrid[row][col] = getSafeSymbol(finalGrid, row, col, outcome);
-        }
-      }
+    // Cherry check on left reel
+    if (grid[0][0] === SYMBOLS.CHERRY || grid[1][0] === SYMBOLS.CHERRY || grid[2][0] === SYMBOLS.CHERRY) {
+      if(currentOutcome === WIN_TYPES.LOSE) currentOutcome = WIN_TYPES.CHERRY;
     }
+    
+    if (currentOutcome === outcome) return indices;
   }
-
-  return finalGrid;
+  return indices; // Fallback
 }
 
 function updateButtons() {
@@ -227,11 +200,13 @@ function updateButtons() {
     paylineCenter.classList.remove('win-glow');
   } else if (gameState === STATE_SPINNING) {
     betBtns.forEach((b, index) => {
-      b.disabled = false; 
-      if (index === stopsPressed) {
+      const r = reels[index];
+      if (r.spinning) {
+        b.disabled = false;
         b.classList.remove('dimmed');
         b.classList.add('active-turn');
       } else {
+        b.disabled = true;
         b.classList.add('dimmed');
         b.classList.remove('active-turn');
       }
@@ -241,54 +216,68 @@ function updateButtons() {
 
 function updateDisplays() {
   creditDisplay.innerText = credits;
+  if (isBonusMode) {
+    bonusCounterDiv.style.display = 'flex';
+    bonusDisplay.innerText = bonusGamesRemaining;
+  } else {
+    bonusCounterDiv.style.display = 'none';
+  }
 }
 
 function handleSpin() {
+  console.log("Spin triggered! GameState:", gameState, "Credits:", credits);
   if (gameState !== STATE_IDLE) return;
-  if (credits < 3) return; // 1 spin = 3 credits required
+  
+  if (isBonusMode) {
+    bonusGamesRemaining--;
+    if (bonusGamesRemaining < 0) {
+      isBonusMode = false;
+      gogoLamp.classList.remove('gogo-active');
+      audioEngine.stopBonusBGM();
+    }
+  }
 
-  credits -= 3;
+  const cost = isBonusMode ? 1 : 3;
+  if (credits < cost) return;
+  credits -= cost;
+
   payoutDisplay.innerText = '0';
   updateDisplays();
   
   gameState = STATE_SPINNING;
-  gogoLamp.classList.remove('gogo-active');
+  if (!isBonusMode) gogoLamp.classList.remove('gogo-active');
   spinLever.disabled = true;
-
-  // Clear previous win lines
   paylineCenter.classList.remove('win-glow');
 
-  // Core RNG! Calculate Target once at trigger!
-  let outcome = getSpinOutcome();
-  targetGrid = generateTargetGrid(outcome);
+  // Core RNG! Determine FLAG
+  winFlag = getSpinOutcome();
   
-  // Fill the virtual strips dynamically for the visual spin. Range indices 0 to 60.
-  for(let i=0; i<3; i++) {
-    expandedReels[i] = [];
-    for(let k=0; k<60; k++) expandedReels[i].push(FILLER_SYMBOLS[Math.floor(Math.random() * FILLER_SYMBOLS.length)]);
-    // Avoid Cherry on left reel initially so it doesn't flicker by
-    if (i === 0) expandedReels[0] = expandedReels[0].map(s => s === SYMBOLS.CHERRY ? SYMBOLS.BLANK : s);
-    
-    reelStrips[i].innerHTML = expandedReels[i].map(s => `<div class="symbol">${s}</div>`).join('');
-    
-    // Set reel pos safely high into cycle
-    reelPos[i] = 2500; 
-    reelStrips[i].style.transition = 'none';
-    reelStrips[i].style.transform = `translateY(-${reelPos[i]}px)`;
-    
-    isSpinning[i] = true;
-    isStopping[i] = false;
-    reelSpeed[i] = 0;
+  // High probability of win during bonus
+  if (isBonusMode) {
+    const bonusRand = Math.random();
+    if (bonusRand < 0.7) winFlag = WIN_TYPES.GRAPE;
+    else if (bonusRand < 0.9) winFlag = WIN_TYPES.BELL;
+    else winFlag = WIN_TYPES.LOSE;
   }
+
+  // Pre-calculate target indices on the actual STRIPS
+  plannedIndices = computePlannedIndices(winFlag);
+  
+  reels.forEach(r => {
+    r.spinning = true;
+    r.stopping = false;
+    r.speed = 0;
+  });
 
   stopsPressed = 0;
   updateButtons();
 
-  // Add blur class on spin start
-  reelStrips.forEach(s => s.classList.add('blur'));
-
-  audioEngine.playLever();
-  audioEngine.startReelSpin();
+  try {
+    audioEngine.playLever();
+    audioEngine.startReelSpin();
+  } catch (e) {
+    console.warn("Audio error:", e);
+  }
   
   if (!loopRunning) {
     loopRunning = true;
@@ -298,46 +287,27 @@ function handleSpin() {
 }
 
 function handleStop(i) {
-  if (!isSpinning[i] || isStopping[i]) return;
-  if (i !== stopsPressed) return;
+  const r = reels[i];
+  if (!r.spinning) return;
   
-  isStopping[i] = true;
-  stopsPressed++;
+  // Instant Stop logic
+  r.spinning = false;
+  r.speed = 0;
+  r.pos = Math.round(r.pos); // Snap to nearest integer center
+  renderReels();
+
+  stopsPressed++; // used for sound variation mainly
   
   if (stopsPressed === 3) {
     audioEngine.playTone('triangle', 300, 50, 0.2, 1.0);
     audioEngine.playTone('square', 150, 30, 0.25, 0.7);
     audioEngine.playTone('noise', 800, 100, 0.1, 0.4, true); 
+    audioEngine.stopReelSpin();
   } else {
     audioEngine.playStop(stopsPressed);
   }
   
   updateButtons(); 
-  
-  // Calculate destination injection 
-  let currentPos = reelPos[i];
-  let targetPos = Math.floor(currentPos / SYMBOL_SIZE) * SYMBOL_SIZE;
-  if (currentPos - targetPos < 15) {
-    targetPos -= SYMBOL_SIZE;
-  }
-  targetPos -= (8 * SYMBOL_SIZE); // Stop 8 symbols down
-  
-  // Directly inject target array outcome exactly at target targetPos index
-  let stopIndex = Math.round(targetPos / SYMBOL_SIZE);
-  
-  // Bounds check (stopIndex will be ~2500/80 - 8 = ~23)
-  if (stopIndex > 0 && stopIndex + 2 < expandedReels[i].length) {
-    expandedReels[i][stopIndex] = targetGrid[0][i];
-    expandedReels[i][stopIndex + 1] = targetGrid[1][i];
-    expandedReels[i][stopIndex + 2] = targetGrid[2][i];
-    reelStrips[i].innerHTML = expandedReels[i].map(s => `<div class="symbol">${s}</div>`).join('');
-  }
-  
-  stopTargets[i] = targetPos;
-  
-  if (stopsPressed === 3) {
-    audioEngine.stopReelSpin();
-  }
 }
 
 function gameLoop(time) {
@@ -348,38 +318,25 @@ function gameLoop(time) {
   if (dt > 100) dt = 16; 
   
   let allStopped = true;
+  const MAX_SPEED = 0.5; // Symbols per frame (~30px / frame at 60fps)
   
-  for(let i=0; i<3; i++) {
-    if (isSpinning[i]) {
+  reels.forEach(r => {
+    if (r.spinning) {
       allStopped = false;
+      // Normal spinning
+      r.speed = Math.min(r.speed + 0.01 * (dt / 16), MAX_SPEED);
+      r.pos += r.speed * (dt / 16);
       
-      if (!isStopping[i]) {
-        reelSpeed[i] = Math.min(reelSpeed[i] + 0.15 * dt, MAX_SPEED);
-        reelPos[i] -= reelSpeed[i] * (dt / 16);
-        if (reelPos[i] < 1600) {
-          reelPos[i] += 1600; // Loop bound
-        }
-      } else {
-        let dist = reelPos[i] - stopTargets[i];
-        if (dist <= 0) {
-          reelPos[i] = stopTargets[i];
-          if (reelPos[i] < 0) reelPos[i] += 1600;
-          isSpinning[i] = false;
-        } else {
-          let move = reelSpeed[i] * (dt / 16);
-          if (move > dist) move = dist;
-          reelPos[i] -= move;
-        }
-      }
-      reelStrips[i].style.transform = `translateY(-${reelPos[i]}px)`;
+      // Keep pos in reasonable bounds (e.g. [0, 20)) to avoid large float precision issues over long play
+      if (r.pos > 20) r.pos -= 20;
     }
-  }
+  });
+
+  renderReels();
   
   if (allStopped && gameState === STATE_SPINNING) {
     gameState = STATE_PAYOUT;
     loopRunning = false;
-    // Remove blur when all stopped
-    reelStrips.forEach(s => s.classList.remove('blur'));
     processOutcome();
   } else {
     requestAnimationFrame(gameLoop);
@@ -397,12 +354,11 @@ function getLinePayout(symbols) {
 }
 
 function processOutcome() {
-  for(let i=0; i<3; i++) {
-    let finalIndex = Math.round(reelPos[i] / SYMBOL_SIZE);
-    grid[0][i] = expandedReels[i][finalIndex];
-    grid[1][i] = expandedReels[i][finalIndex + 1];
-    grid[2][i] = expandedReels[i][finalIndex + 2];
-  }
+  const grid = [
+    [getSymbol(reels[0].strip, reels[0].pos - 1), getSymbol(reels[1].strip, reels[1].pos - 1), getSymbol(reels[2].strip, reels[2].pos - 1)],
+    [getSymbol(reels[0].strip, reels[0].pos),     getSymbol(reels[1].strip, reels[1].pos),     getSymbol(reels[2].strip, reels[2].pos)],
+    [getSymbol(reels[0].strip, reels[0].pos + 1), getSymbol(reels[1].strip, reels[1].pos + 1), getSymbol(reels[2].strip, reels[2].pos + 1)]
+  ];
 
   let totalPayout = 0;
   let hasBonus = false;
@@ -433,15 +389,25 @@ function processOutcome() {
     totalPayout += PAYOUTS.CHERRY;
   }
 
-  if (hasBonus) {
+  if (hasBonus && !isBonusMode) {
+    // First time hitting bonus!
     setTimeout(() => {
       gogoLamp.classList.add('gogo-active'); 
       audioEngine.playBonus(); 
       paylineCenter.classList.add('win-glow');
-      setTimeout(() => startPayout(totalPayout), 1000);
-    }, 200);
+      
+      // Enter Bonus Mode
+      isBonusMode = true;
+      bonusGamesRemaining = (totalPayout === PAYOUTS.BIG) ? 24 : 8; // BIG=24, REG=8
+      
+      setTimeout(() => {
+        audioEngine.playBonusBGM();
+        startPayout(totalPayout);
+      }, 1000);
+    }, 400); // The "間" (Pause)
   } else if (totalPayout > 0) {
-    audioEngine.playTone('sine', 800, 1000, 0.1, 0.3); // Gentle tone
+    if (!isBonusMode) audioEngine.playTone('sine', 800, 1000, 0.1, 0.3); 
+    else audioEngine.playTone('square', 600, 800, 0.1, 0.4); // Bonus hit sound
     startPayout(totalPayout);
   } else {
     setTimeout(resetTurn, 200);

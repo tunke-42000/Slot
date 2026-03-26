@@ -4,6 +4,7 @@ class RetroSlotAudio {
     this.ctx = null;
     this.spinInterval = null;
     this.isSpinning = false;
+    this.bgmOscs = [];
   }
 
   init() {
@@ -191,10 +192,43 @@ class RetroSlotAudio {
     setTimeout(() => {
       this.playTone('sine', 1046.50, 1046.50, 0.8, 0.5); // C6
       this.playTone('triangle', 1567.98, 1567.98, 0.8, 0.3); // G6
+      this.playTone('sawtooth', 523.25, 523.25, 0.8, 0.2); // C4 base
     }, 150);
   }
 
-  // 6. Payout (Charin Charin - fine rhythmic)
+  // 6. Bonus BGM (Upbeat rhythmic loop)
+  playBonusBGM() {
+    this.init();
+    this.stopBonusBGM();
+    
+    const tempo = 140;
+    const beatSec = 60 / tempo;
+    const notes = [523.25, 659.25, 783.99, 1046.50]; // C Major
+    let step = 0;
+
+    this.bgmInterval = setInterval(() => {
+      const t = this.ctx.currentTime;
+      const freq = notes[step % notes.length];
+      
+      this.playTone('square', freq, freq * 0.9, 0.2, 0.2);
+      
+      // Kick drum like beat
+      if (step % 2 === 0) {
+        this.playTone('sine', 120, 40, 0.15, 0.5);
+      }
+      
+      step++;
+    }, beatSec * 500); // 8th notes
+  }
+
+  stopBonusBGM() {
+    if (this.bgmInterval) {
+      clearInterval(this.bgmInterval);
+      this.bgmInterval = null;
+    }
+  }
+
+  // 7. Payout (Charin Charin - fine rhythmic)
   playPayoutCoin() {
     this.init();
     const t = this.ctx.currentTime;

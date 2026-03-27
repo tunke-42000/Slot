@@ -106,8 +106,9 @@ const btnReturnTitle = document.getElementById('btn-return-title');
 
 function initGame() {
   audioEngine = new RetroSlotAudio();
+  audioEngine.loadAllSounds();
   
-  // No longer need a loading guard for HTMLAudio on file://
+  // No longer need a loading guard for Base64 assets
   spinLever.classList.remove('dimmed');
 
   // Unified Pointer Events

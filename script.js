@@ -107,13 +107,8 @@ const btnReturnTitle = document.getElementById('btn-return-title');
 function initGame() {
   audioEngine = new RetroSlotAudio();
   
-  // Disable controls until audio is loaded
-  spinLever.classList.add('dimmed');
-  
-  audioEngine.loadAllSounds().then(() => {
-    console.log("Audio assets loaded.");
-    spinLever.classList.remove('dimmed');
-  });
+  // No longer need a loading guard for HTMLAudio on file://
+  spinLever.classList.remove('dimmed');
 
   // Unified Pointer Events
   spinLever.addEventListener('pointerdown', (e) => {
@@ -128,11 +123,15 @@ function initGame() {
     });
   });
 
-  btnStartGame.addEventListener('pointerdown', async (e) => {
-    e.preventDefault();
-    await audioEngine.unlock();
-    audioEngine.playStart();
-    setTimeout(() => switchScreen(SCREEN_GAME), 600);
+  btnStartGame.addEventListener('click', async (e) => {
+    console.log("[Script] Start button clicked (audio unlock attempt).");
+    try {
+      await audioEngine.unlock();
+      audioEngine.playStart();
+    } catch (err) {
+      console.warn("[Script] Audio unlock failed:", err);
+    }
+    switchScreen(SCREEN_GAME);
   });
 
   btnReturnTitle.addEventListener('pointerdown', (e) => {
@@ -315,9 +314,8 @@ function updateDisplays() {
 }
 
 function handleSpin() {
+  console.log("[Script] handleSpin called. gameState:", gameState);
   if (gameState !== STATE_IDLE) return;
-  // Guard for audio loading
-  if (!audioEngine.buffers.reba) return; 
 
   if (isBonusMode) {
     bonusGamesRemaining--;
@@ -382,6 +380,7 @@ function handleSpin() {
 }
 
 function handleStop(i) {
+  console.log(`[Script] handleStop called for reel ${i}.`);
   const r = reels[i];
   if (!r.spinning) return;
   

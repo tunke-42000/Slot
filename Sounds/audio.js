@@ -1,21 +1,33 @@
 class RetroSlotAudio {
   constructor() {
     this.ctx = null;
-    this.buffers = {};
     this.gakoPlayed = false;
     this.isSpinning = false;
     this.spinInterval = null;
     this.bgmInterval = null;
     
-    // Volumes from user requirements
-    this.gakoVol = 0.9;
-    this.rebaVol = 0.75;
-    this.botanVol = 1.0; 
+    // MP3 Sounds using HTMLAudioElement (CORS safe for file://)
+    this.sounds = {
+      gako: new Audio('./Sounds/ziyagura-gako.mp3'),
+      reba: new Audio('./Sounds/ziyagura-reba.mp3'),
+      botan: [
+        new Audio('./Sounds/ziyagura-botan.mp3'),
+        new Audio('./Sounds/ziyagura-botan.mp3'),
+        new Audio('./Sounds/ziyagura-botan.mp3')
+      ]
+    };
+    this.botanIndex = 0;
+
+    // Set volumes
+    this.sounds.gako.volume = 0.9;
+    this.sounds.reba.volume = 0.75;
+    this.sounds.botan.forEach(a => a.volume = 1.0);
   }
 
-  async init() {
+  async init(forceResume = false) {
     if (!this.ctx) {
-      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AudioCtx();
       this.masterGain = this.ctx.createGain();
       this.masterGain.connect(this.ctx.destination);
       this.masterGain.gain.value = 0.8;
@@ -24,64 +36,44 @@ class RetroSlotAudio {
       this.reelsGain.connect(this.masterGain);
       this.reelsGain.gain.value = 0.15;
     }
-    if (this.ctx.state === 'suspended') {
-      await this.ctx.resume();
+    if (forceResume && this.ctx.state === 'suspended') {
+      try {
+        await this.ctx.resume();
+        console.log("[AudioEngine] Context resumed. Current state:", this.ctx.state);
+      } catch (err) {
+        console.warn("AudioContext resume failed:", err);
+      }
     }
+    return this.ctx;
   }
 
   // Mandatory for mobile: call on first user gesture
   async unlock() {
-    await this.init();
-    // Play a short silent buffer to "wake up" the AudioContext on iOS
-    const silentBuffer = this.ctx.createBuffer(1, 1, 22050);
-    const source = this.ctx.createBufferSource();
-    source.buffer = silentBuffer;
-    source.connect(this.ctx.destination);
-    source.start(0);
-  }
+    console.log("[AudioEngine] Unlocking all audio systems...");
+    await this.init(true);
 
-  async loadAllSounds() {
-    const files = {
-      gako: './Sounds/ziyagura-gako.mp3',
-      reba: './Sounds/ziyagura-reba.mp3',
-      botan: './Sounds/ziyagura-botan.mp3'
+    // iOS/Mobile: Unlock HTMLAudio objects by playing/pausing
+    const unlockSound = (a) => {
+      a.play().then(() => {
+        a.pause();
+        a.currentTime = 0;
+      }).catch(e => console.log("Audio object unlock poke info:", e));
     };
 
-    const promises = Object.entries(files).map(async ([key, url]) => {
-      try {
-        const response = await fetch(url);
-        const arrayBuffer = await response.arrayBuffer();
-        this.buffers[key] = await this.ctx.decodeAudioData(arrayBuffer);
-        console.log(`Loaded: ${key}`);
-      } catch (e) {
-        console.error(`Failed to load ${url}:`, e);
-      }
-    });
-
-    await Promise.all(promises);
+    unlockSound(this.sounds.gako);
+    unlockSound(this.sounds.reba);
+    this.sounds.botan.forEach(a => unlockSound(a));
   }
 
-  // Play an AudioBuffer using a fresh SourceNode every time
-  playBuffer(bufferName, volume = 1.0) {
-    if (!this.ctx || !this.buffers[bufferName]) return;
-    
-    const source = this.ctx.createBufferSource();
-    source.buffer = this.buffers[bufferName];
-    
-    const gainNode = this.ctx.createGain();
-    gainNode.gain.value = volume;
-    
-    source.connect(gainNode);
-    gainNode.connect(this.masterGain);
-    
-    source.start(0);
-    
-    // Auto-cleanup reference
-    source.onended = () => {
-      gainNode.disconnect();
-      source.disconnect();
-    };
-  }
+  // This method is no longer needed as we use new Audio()
+  // async loadAllSounds() {
+  //   // Removed
+  // }
+
+  // This method is no longer needed for MP3s
+  // playBuffer(bufferName, volume = 1.0) {
+  //   // Removed
+  // }
 
   // Helper to play a quick tone with pitch drop/envelope
   playTone(type, startHz, endHz, duration, vol, isNoise = false) {
@@ -99,9 +91,7 @@ class RetroSlotAudio {
       const bufferSize = this.ctx.sampleRate * duration;
       const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
       const data = buffer.getChannelData(0);
-      for (let i = 0; i < bufferSize; i++) {
-        data[i] = Math.random() * 2 - 1;
-      }
+      for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
       const noise = this.ctx.createBufferSource();
       noise.buffer = buffer;
       const filter = this.ctx.createBiquadFilter();
@@ -117,9 +107,7 @@ class RetroSlotAudio {
       osc.type = type;
       osc.connect(gainNode);
       osc.frequency.setValueAtTime(startHz, t);
-      if (endHz) {
-        osc.frequency.exponentialRampToValueAtTime(endHz, t + duration);
-      }
+      if (endHz) osc.frequency.exponentialRampToValueAtTime(endHz, t + duration);
       osc.start(t);
       osc.stop(t + duration);
     }
@@ -137,7 +125,7 @@ class RetroSlotAudio {
     if (this.isSpinning) return;
     this.isSpinning = true;
     this.spinInterval = setInterval(() => {
-      if (!this.isSpinning) return;
+      if (!this.isSpinning || !this.ctx) return;
       const t = this.ctx.currentTime;
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
@@ -152,7 +140,7 @@ class RetroSlotAudio {
       osc.start(t);
       osc.stop(t + 0.05);
       setTimeout(() => gain.disconnect(), 100);
-    }, 120);
+    }, 150);
   }
 
   stopReelSpin() {
@@ -209,20 +197,17 @@ class RetroSlotAudio {
 
   playBonusBGM() {
     this.init();
-    this.stopBonusBGM();
-    const tempo = 140;
-    const beatSec = 60 / tempo;
+    if (this.bgmInterval) return;
     const notes = [523.25, 659.25, 783.99, 1046.50];
     let step = 0;
     this.bgmInterval = setInterval(() => {
-      const t = this.ctx.currentTime;
       const freq = notes[step % notes.length];
       this.playTone('square', freq, freq * 0.9, 0.2, 0.2);
       if (step % 2 === 0) {
         this.playTone('sine', 120, 40, 0.15, 0.5);
       }
       step++;
-    }, beatSec * 500);
+    }, 214);
   }
 
   stopBonusBGM() {
@@ -246,15 +231,21 @@ class RetroSlotAudio {
   }
 
   playGako() {
-    this.playBuffer('gako', this.gakoVol);
+    const a = this.sounds.gako;
+    a.currentTime = 0;
+    a.play().catch(e => console.warn("Gako play fail:", e));
   }
 
   playBotan() {
-    this.playBuffer('botan', this.botanVol);
+    const a = this.sounds.botan[this.botanIndex];
+    a.currentTime = 0;
+    a.play().catch(e => console.warn("Botan play fail:", e));
+    this.botanIndex = (this.botanIndex + 1) % this.sounds.botan.length;
   }
 
   playReba() {
-    this.playBuffer('reba', this.rebaVol);
+    const a = this.sounds.reba;
+    a.currentTime = 0;
+    a.play().catch(e => console.warn("Reba play fail:", e));
   }
 }
-

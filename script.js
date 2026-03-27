@@ -107,19 +107,36 @@ const btnReturnTitle = document.getElementById('btn-return-title');
 function initGame() {
   audioEngine = new RetroSlotAudio();
   
-  spinLever.disabled = false;
-  spinLever.addEventListener('click', handleSpin);
-  spinLever.addEventListener('touchstart', (e) => { e.preventDefault(); handleSpin(); });
-
-  betBtns.forEach((btn, index) => {
-    btn.addEventListener('pointerdown', () => handleStop(index));
+  // Disable controls until audio is loaded
+  spinLever.classList.add('dimmed');
+  
+  audioEngine.loadAllSounds().then(() => {
+    console.log("Audio assets loaded.");
+    spinLever.classList.remove('dimmed');
   });
 
-  btnStartGame.addEventListener('click', () => {
+  // Unified Pointer Events
+  spinLever.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    handleSpin();
+  });
+
+  betBtns.forEach((btn, index) => {
+    btn.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      handleStop(index);
+    });
+  });
+
+  btnStartGame.addEventListener('pointerdown', async (e) => {
+    e.preventDefault();
+    await audioEngine.unlock();
     audioEngine.playStart();
     setTimeout(() => switchScreen(SCREEN_GAME), 600);
   });
-  btnReturnTitle.addEventListener('click', () => {
+
+  btnReturnTitle.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
     resetGame();
     switchScreen(SCREEN_TITLE);
   });
@@ -144,10 +161,8 @@ function switchScreen(screen) {
 }
 
 function resetGame() {
-  // Clear Intervals
   if (payoutInterval) clearInterval(payoutInterval);
   
-  // Reset Flags
   gameState = STATE_IDLE;
   credits = 100;
   bonusGamesRemaining = 0;
@@ -157,7 +172,6 @@ function resetGame() {
   winFlag = null;
   plannedIndices = [0, 0, 0];
 
-  // Reset Reels
   reels.forEach(r => {
     r.pos = 5;
     r.speed = 0;
@@ -165,13 +179,11 @@ function resetGame() {
     r.stopping = false;
   });
 
-  // Reset UI
   gogoLamp.classList.remove('gogo-active');
   paylineCenter.classList.remove('win-glow');
   payoutDisplay.innerText = '0';
   creditOutOverlay.classList.add('hidden');
   
-  // Audio Reset
   audioEngine.stopReelSpin();
   audioEngine.stopBonusBGM();
 
@@ -182,7 +194,6 @@ function resetGame() {
 
 function getSymbol(strip, index) {
   const len = strip.length;
-  // Use modulo for wrap-around (handle negative indices too)
   return strip[((index % len) + len) % len];
 }
 
@@ -192,29 +203,27 @@ function renderReels() {
     const intPos = Math.floor(r.pos);
     const frac = r.pos - intPos;
     
-    // User definition: Middle = position
-    // So we render symbols at: [pos-2, pos-1, pos, pos+1, pos+2]
-    // index 2 (pos) will be the center.
+    // NEW DEFINITION (Falling):
+    // pos = Middle symbol index.
+    // Top = pos + 1
+    // Mid = pos
+    // Bot = pos - 1
+    // Render order (top to bottom): [pos+2, pos+1, pos, pos-1, pos-2]
     const symbols = [
-      getSymbol(r.strip, intPos - 2), // Peeking top
-      getSymbol(r.strip, intPos - 1), // Top Row
-      getSymbol(r.strip, intPos),     // Middle Row (Center Line)
-      getSymbol(r.strip, intPos + 1), // Bottom Row
-      getSymbol(r.strip, intPos + 2)  // Peeking bottom
+      getSymbol(r.strip, intPos + 2), 
+      getSymbol(r.strip, intPos + 1), 
+      getSymbol(r.strip, intPos),     
+      getSymbol(r.strip, intPos - 1), 
+      getSymbol(r.strip, intPos - 2)  
     ];
     
     stripEl.innerHTML = symbols.map(s => `<div class="symbol">${s}</div>`).join('');
     
-    // Offset calculation:
-    // With 5 symbols, the center of the 3rd symbol is at y = 2.5 * 80? No.
-    // Each .symbol is 80px.
-    // 5 symbols = 400px high.
-    // Reel window is 240px high (3 symbols).
-    // To center the 3 visible symbols (pos-1, pos, pos+1), 
-    // we need to hide the top peeking symbol (pos-2).
-    // So translateY starts at -80px.
-    // Plus the fractional part: -(frac * 80).
-    const offsetY = -80 - (frac * SYMBOL_SIZE);
+    // FALLING OFFSET:
+    // When frac=0, symbols[2] (pos) is at center (y=120). 
+    // Container translateY = -80 centers symbols[2].
+    // When frac increases (pos += speed), container translateY should INCREASE (move down).
+    const offsetY = -80 + (frac * SYMBOL_SIZE);
     stripEl.style.transform = `translateY(${offsetY}px)`;
   });
 }
@@ -239,14 +248,13 @@ function computePlannedIndices(outcome) {
     indices[1] = Math.floor(Math.random() * 20);
     indices[2] = Math.floor(Math.random() * 20);
     
-    // Check outcome
+    // grid: [Top, Mid, Bot] x [R1, R2, R3]
     const grid = [
-      [getSymbol(STRIPS[0], indices[0]-1), getSymbol(STRIPS[1], indices[1]-1), getSymbol(STRIPS[2], indices[2]-1)],
+      [getSymbol(STRIPS[0], indices[0]+1), getSymbol(STRIPS[1], indices[1]+1), getSymbol(STRIPS[2], indices[2]+1)],
       [getSymbol(STRIPS[0], indices[0]),   getSymbol(STRIPS[1], indices[1]),   getSymbol(STRIPS[2], indices[2])],
-      [getSymbol(STRIPS[0], indices[0]+1), getSymbol(STRIPS[1], indices[1]+1), getSymbol(STRIPS[2], indices[2]+1)]
+      [getSymbol(STRIPS[0], indices[0]-1), getSymbol(STRIPS[1], indices[1]-1), getSymbol(STRIPS[2], indices[2]-1)]
     ];
     
-    // Simplified payout check for finding indices
     let currentOutcome = WIN_TYPES.LOSE;
     const lc = [[[1,0],[1,1],[1,2]],[[0,0],[0,1],[0,2]],[[2,0],[2,1],[2,2]],[[0,0],[1,1],[2,2]],[[2,0],[1,1],[0,2]]];
     
@@ -255,16 +263,14 @@ function computePlannedIndices(outcome) {
       if (s0 === SYMBOLS.S7 && s1 === SYMBOLS.S7 && s2 === SYMBOLS.S7) currentOutcome = WIN_TYPES.BIG;
       else if (s0 === SYMBOLS.S7 && s1 === SYMBOLS.S7 && s2 === SYMBOLS.BAR) currentOutcome = WIN_TYPES.REG;
       else if (s0 === SYMBOLS.BELL && s1 === SYMBOLS.BELL && s2 === SYMBOLS.BELL) if(currentOutcome === WIN_TYPES.LOSE) currentOutcome = WIN_TYPES.BELL;
-      // ... more checks if needed, but BIG/REG/LOSE are most critical for stopping
     }
-    // Cherry check on left reel
     if (grid[0][0] === SYMBOLS.CHERRY || grid[1][0] === SYMBOLS.CHERRY || grid[2][0] === SYMBOLS.CHERRY) {
       if(currentOutcome === WIN_TYPES.LOSE) currentOutcome = WIN_TYPES.CHERRY;
     }
     
     if (currentOutcome === outcome) return indices;
   }
-  return indices; // Fallback
+  return indices;
 }
 
 function updateButtons() {
@@ -300,7 +306,6 @@ function updateDisplays() {
     bonusCounterDiv.style.display = 'none';
   }
 
-  // Credit Out detection
   const needed = isBonusMode ? BONUS_SPIN_COST : SPIN_COST;
   if (credits < needed && gameState === STATE_IDLE) {
     creditOutOverlay.classList.remove('hidden');
@@ -310,9 +315,10 @@ function updateDisplays() {
 }
 
 function handleSpin() {
-  console.log("Spin triggered! GameState:", gameState, "Credits:", credits);
   if (gameState !== STATE_IDLE) return;
-  
+  // Guard for audio loading
+  if (!audioEngine.buffers.reba) return; 
+
   if (isBonusMode) {
     bonusGamesRemaining--;
     if (bonusGamesRemaining < 0) {
@@ -325,26 +331,21 @@ function handleSpin() {
   const cost = isBonusMode ? BONUS_SPIN_COST : SPIN_COST;
   if (credits < cost) return;
 
-  // --- Lever Animation & Sound ---
   spinLever.classList.add('is-pressed');
   setTimeout(() => spinLever.classList.remove('is-pressed'), 120);
   audioEngine.playReba();
 
   credits -= cost;
-
   payoutDisplay.innerText = '0';
-  audioEngine.gakoPlayed = false; // Reset flag
+  audioEngine.gakoPlayed = false;
   updateDisplays();
   
   gameState = STATE_SPINNING;
   if (!isBonusMode) gogoLamp.classList.remove('gogo-active');
-  spinLever.disabled = true;
+  spinLever.classList.add('dimmed');
   paylineCenter.classList.remove('win-glow');
 
-  // Core RNG! Determine FLAG
   winFlag = getSpinOutcome();
-  
-  // High probability of win during bonus
   if (isBonusMode) {
     const bonusRand = Math.random();
     if (bonusRand < 0.7) winFlag = WIN_TYPES.GRAPE;
@@ -352,7 +353,6 @@ function handleSpin() {
     else winFlag = WIN_TYPES.LOSE;
   }
 
-  // Pre-calculate target indices on the actual STRIPS
   plannedIndices = computePlannedIndices(winFlag);
   
   reels.forEach(r => {
@@ -361,24 +361,18 @@ function handleSpin() {
     r.speed = 0;
   });
 
-  // --- Gako Sound logic (Bonus Hit Notification) ---
   const isBonusHit = (winFlag === WIN_TYPES.BIG || winFlag === WIN_TYPES.REG);
   if (isBonusHit && !audioEngine.gakoPlayed) {
     audioEngine.playGako();
     audioEngine.gakoPlayed = true;
-    // Turn on lamp simultaneously with Gako sound
     gogoLamp.classList.add('gogo-active');
   }
 
   stopsPressed = 0;
   updateButtons();
 
-  try {
-    audioEngine.playLever();
-    audioEngine.startReelSpin();
-  } catch (e) {
-    console.warn("Audio error:", e);
-  }
+  audioEngine.playLever();
+  audioEngine.startReelSpin();
   
   if (!loopRunning) {
     loopRunning = true;
@@ -391,21 +385,17 @@ function handleStop(i) {
   const r = reels[i];
   if (!r.spinning) return;
   
-  // --- Stop Button Sound (ziyagura-botan.mp3) ---
   audioEngine.playBotan();
 
-  // Instant Stop logic
   r.spinning = false;
   r.speed = 0;
-  r.pos = Math.round(r.pos); // Snap to nearest integer center
+  r.pos = Math.round(r.pos); // Snap to center
   renderReels();
 
-  stopsPressed++; // used for sound variation mainly
-  
+  stopsPressed++;
   if (stopsPressed === 3) {
     audioEngine.stopReelSpin();
   }
-  
   updateButtons(); 
 }
 
@@ -417,20 +407,13 @@ function gameLoop(time) {
   if (dt > 100) dt = 16; 
   
   let allStopped = true;
-  
-  // Calculate Target Speed: symbols per frame (based on 60fps normalization)
-  // Target: 1 symbol per SPIN_SPEED (ms).
-  // At 60fps (16.66ms per frame), this is (16.66 / SPIN_SPEED) symbols per frame.
   const TARGET_SPEED_60FPS = (16.666 / SPIN_SPEED); 
   
   reels.forEach(r => {
     if (r.spinning) {
       allStopped = false;
-      // Normal spinning with gradual acceleration
       r.speed = Math.min(r.speed + 0.01 * (dt / 16), TARGET_SPEED_60FPS);
       r.pos += r.speed * (dt / 16);
-      
-      // Keep pos in reasonable bounds (e.g. [0, 20)) to avoid large float precision issues over long play
       if (r.pos > 20) r.pos -= 20;
     }
   });
@@ -457,10 +440,11 @@ function getLinePayout(symbols) {
 }
 
 function processOutcome() {
+  // Mapping check: Top:+1, Mid:0, Bot:-1
   const grid = [
-    [getSymbol(reels[0].strip, reels[0].pos - 1), getSymbol(reels[1].strip, reels[1].pos - 1), getSymbol(reels[2].strip, reels[2].pos - 1)],
+    [getSymbol(reels[0].strip, reels[0].pos + 1), getSymbol(reels[1].strip, reels[1].pos + 1), getSymbol(reels[2].strip, reels[2].pos + 1)],
     [getSymbol(reels[0].strip, reels[0].pos),     getSymbol(reels[1].strip, reels[1].pos),     getSymbol(reels[2].strip, reels[2].pos)],
-    [getSymbol(reels[0].strip, reels[0].pos + 1), getSymbol(reels[1].strip, reels[1].pos + 1), getSymbol(reels[2].strip, reels[2].pos + 1)]
+    [getSymbol(reels[0].strip, reels[0].pos - 1), getSymbol(reels[1].strip, reels[1].pos - 1), getSymbol(reels[2].strip, reels[2].pos - 1)]
   ];
 
   let totalPayout = 0;
@@ -487,30 +471,25 @@ function processOutcome() {
     }
   }
 
-  // Left Reel Cherry
   if (grid[0][0] === SYMBOLS.CHERRY || grid[1][0] === SYMBOLS.CHERRY || grid[2][0] === SYMBOLS.CHERRY) {
     totalPayout += PAYOUTS.CHERRY;
   }
 
   if (hasBonus && !isBonusMode) {
-    // First time hitting bonus!
     setTimeout(() => {
       gogoLamp.classList.add('gogo-active'); 
       audioEngine.playBonus(); 
       paylineCenter.classList.add('win-glow');
-      
-      // Enter Bonus Mode
       isBonusMode = true;
-      bonusGamesRemaining = (totalPayout === PAYOUTS.BIG) ? 24 : 8; // BIG=24, REG=8
-      
+      bonusGamesRemaining = (totalPayout === PAYOUTS.BIG) ? 24 : 8;
       setTimeout(() => {
         audioEngine.playBonusBGM();
         startPayout(totalPayout);
       }, 1000);
-    }, 400); // The "間" (Pause)
+    }, 400); 
   } else if (totalPayout > 0) {
     if (!isBonusMode) audioEngine.playTone('sine', 800, 1000, 0.1, 0.3); 
-    else audioEngine.playTone('square', 600, 800, 0.1, 0.4); // Bonus hit sound
+    else audioEngine.playTone('square', 600, 800, 0.1, 0.4);
     startPayout(totalPayout);
   } else {
     setTimeout(resetTurn, 200);
@@ -520,16 +499,13 @@ function processOutcome() {
 function startPayout(amount) {
   let paid = 0;
   let increment = amount > 30 ? 2 : 1; 
-
   payoutInterval = setInterval(() => {
     let add = Math.min(increment, amount - paid);
     paid += add;
     credits += add;
     payoutDisplay.innerText = paid;
     creditDisplay.innerText = credits;
-    
     audioEngine.playPayoutCoin();
-    
     if (paid >= amount) {
       clearInterval(payoutInterval);
       setTimeout(resetTurn, 400); 
@@ -539,7 +515,7 @@ function startPayout(amount) {
 
 function resetTurn() {
   gameState = STATE_IDLE;
-  spinLever.disabled = false;
+  spinLever.classList.remove('dimmed');
   updateButtons();
 }
 
